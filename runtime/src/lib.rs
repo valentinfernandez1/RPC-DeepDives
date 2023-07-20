@@ -390,6 +390,15 @@ impl_runtime_apis! {
 		}
 	}
 
+	impl pallet_template_runtime_api::TemplateApi<Block> for Runtime {
+		fn sum_5() -> u32 {
+			TemplateModule::sum_5()
+		}
+		fn sum_and_store(value: u32) -> u32 {
+			TemplateModule::sum_and_store(value)
+		}
+	}
+
 	impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
 		fn validate_transaction(
 			source: TransactionSource,

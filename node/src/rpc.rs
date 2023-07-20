@@ -9,12 +9,12 @@ use std::sync::Arc;
 
 use jsonrpsee::RpcModule;
 use node_template_runtime::{opaque::Block, AccountId, Balance, Index};
+use pallet_template_rpc::{TemplateApiServer, TemplatePallet};
+pub use sc_rpc_api::DenyUnsafe;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
-
-pub use sc_rpc_api::DenyUnsafe;
 
 /// Full client dependencies.
 pub struct FullDeps<C, P> {
@@ -37,6 +37,7 @@ where
 	C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: BlockBuilder<Block>,
+	C::Api: pallet_template_rpc::TemplateRuntimeApi<Block>,
 	P: TransactionPool + 'static,
 {
 	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
@@ -46,7 +47,9 @@ where
 	let FullDeps { client, pool, deny_unsafe } = deps;
 
 	module.merge(System::new(client.clone(), pool.clone(), deny_unsafe).into_rpc())?;
-	module.merge(TransactionPayment::new(client).into_rpc())?;
+	module.merge(TransactionPayment::new(client.clone()).into_rpc())?;
+	module.merge(Silly::new(client.clone()).into_rpc())?;
+	module.merge(TemplatePallet::new(client).into_rpc())?;
 
 	// Extend this RPC with a custom API by using the following syntax.
 	// `YourRpcStruct` should have a reference to a client, which is needed
@@ -54,4 +57,46 @@ where
 	// `module.merge(YourRpcTrait::into_rpc(YourRpcStruct::new(ReferenceToClient, ...)))?;`
 
 	Ok(module)
+}
+
+use jsonrpsee::{
+	core::{Error as JsonRpseeError, RpcResult},
+	proc_macros::rpc,
+};
+
+#[rpc(client, server)]
+pub trait SillyRpc {
+	///Returns 5
+	#[method(name = "silly_get5")]
+	fn silly_get_5(&self) -> RpcResult<u64>;
+
+	///Checks if the received block has already been finalized
+	#[method(name = "silly_isBlockFinalized")]
+	fn is_block_finalized(&self, is_finalized: u64) -> RpcResult<bool>;
+}
+
+///Silly rpc test
+pub struct Silly<C> {
+	client: Arc<C>,
+}
+
+impl<C> Silly<C> {
+	/// Create new `Silly` instance with the given reference to the client.
+	pub fn new(client: Arc<C>) -> Self {
+		Self { client }
+	}
+}
+
+impl<C> SillyRpcServer for Silly<C>
+where
+	C: Send + Sync + 'static + ProvideRuntimeApi<Block> + HeaderBackend<Block>,
+{
+	fn silly_get_5(&self) -> Result<u64, JsonRpseeError> {
+		Ok(5)
+	}
+
+	fn is_block_finalized(&self, is_finalized: u64) -> RpcResult<bool> {
+		let last_finalized: u64 = self.client.info().finalized_number.into();
+		Ok(is_finalized <= last_finalized)
+	}
 }

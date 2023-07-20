@@ -105,4 +105,17 @@ pub mod pallet {
 			}
 		}
 	}
+
+	impl<T: Config> Pallet<T> {
+		pub fn sum_5() -> u32 {
+			<Something<T>>::get().unwrap_or(0) + 5
+		}
+
+		pub fn sum_and_store(value: u32) -> u32 {
+			let something = <Something<T>>::get().unwrap_or(0);
+			<Something<T>>::put(something.saturating_add(value));
+
+			<Something<T>>::get().unwrap_or(0)
+		}
+	}
 }

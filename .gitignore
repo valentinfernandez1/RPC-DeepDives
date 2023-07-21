@@ -10,3 +10,5 @@
 .envrc
 .direnv
 **/.bin
+
+**/.vscode
